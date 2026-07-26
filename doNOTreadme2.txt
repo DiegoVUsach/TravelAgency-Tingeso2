@@ -1,10 +1,16 @@
 Java ver 17
 com.travelagency
+to do:
+carpetas
+
+
+
+-----------------------------------------------
 EUREKA SERVER = http://localhost:8761
 
 
 
-
+-----------------------------------------------
 
 
 
@@ -16,3 +22,4 @@ Es el "Directorio Telefónico" (Service Registry) de los microservicios. Sirve p
 En una terminal PowerShell, ve a la carpeta del servidor y ejecútalo con Maven:
 cd C:\Users\diego\Documents\GitHub\TravelAgency-Tingeso2\Backend-microservicios\eureka-server
 .\mvnw.cmd spring-boot:run
+para pauarlo usa ctrl c
