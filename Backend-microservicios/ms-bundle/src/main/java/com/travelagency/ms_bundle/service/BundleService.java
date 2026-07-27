@@ -1,6 +1,5 @@
 package com.travelagency.ms_bundle.service;
 
-
 import com.travelagency.ms_bundle.entity.BundleEntity;
 import com.travelagency.ms_bundle.entity.BundleState;
 import com.travelagency.ms_bundle.entity.ExperienceTypeState;
@@ -10,8 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.travelagency.ms_bundle.repository.BundleRepository;
 import org.springframework.web.client.RestTemplate;
-
-
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -66,8 +63,7 @@ public class BundleService {
                 endDate,
                 experience,
                 season,
-                category
-        );
+                category);
     }
 
     // ---------- Admin CRUD ----------
@@ -107,8 +103,7 @@ public class BundleService {
         // Auto-calculate duration from dates
         int calculatedDuration = (int) ChronoUnit.DAYS.between(
                 bundleEntity.getStartDateBundle(),
-                bundleEntity.getEndDateBundle()
-        );
+                bundleEntity.getEndDateBundle());
         bundleEntity.setDurationBundle(calculatedDuration);
 
         // Set default state if not provided
@@ -125,7 +120,8 @@ public class BundleService {
 
         // *** MICROSERVICE CHANGE ***
         // In the monolith, we called reservationRepository.countByBundleIdBundle(id)
-        // In microservices, we call ms-reservation via HTTP to get the reservation count
+        // In microservices, we call ms-reservation via HTTP to get the reservation
+        // count
         long currentReservations = getReservationCountForBundle(id);
 
         // Validate required fields
@@ -152,12 +148,14 @@ public class BundleService {
             if (!existingBundle.getStartDateBundle().equals(newDetails.getStartDateBundle()) ||
                     !existingBundle.getEndDateBundle().equals(newDetails.getEndDateBundle()) ||
                     existingBundle.getPriceBundle() != newDetails.getPriceBundle()) {
-                throw new IllegalStateException("You cannot modify the price/date: there are already reservations in place.");
+                throw new IllegalStateException(
+                        "You cannot modify the price/date: there are already reservations in place.");
             }
 
             if (newDetails.getAvailableSlotsBundle() < currentReservations) {
-                throw new IllegalStateException("You cannot reduce the total slots to " + newDetails.getAvailableSlotsBundle() +
-                        " because there are already " + currentReservations + " reservations registered.");
+                throw new IllegalStateException(
+                        "You cannot reduce the total slots to " + newDetails.getAvailableSlotsBundle() +
+                                " because there are already " + currentReservations + " reservations registered.");
             }
         } else {
             if (newDetails.getAvailableSlotsBundle() <= 0) {
@@ -190,8 +188,7 @@ public class BundleService {
         // Auto-calculate duration from dates
         int recalculatedDuration = (int) ChronoUnit.DAYS.between(
                 existingBundle.getStartDateBundle(),
-                existingBundle.getEndDateBundle()
-        );
+                existingBundle.getEndDateBundle());
         existingBundle.setDurationBundle(recalculatedDuration);
 
         // Auto-set state to SOLD_OUT if slots reach 0
@@ -228,7 +225,8 @@ public class BundleService {
      * In the monolith, this was: reservationRepository.countByBundleIdBundle(id)
      * In microservices, ms-reservation exposes this as an HTTP endpoint.
      *
-     * Uses Eureka service name "ms-reservation" (resolved by @LoadBalanced RestTemplate)
+     * Uses Eureka service name "ms-reservation" (resolved by @LoadBalanced
+     * RestTemplate)
      */
     private long getReservationCountForBundle(Long bundleId) {
         try {
@@ -241,5 +239,29 @@ public class BundleService {
             // physical deletion if ms-reservation is temporarily unavailable
             return 0;
         }
+    }
+
+    // for reservation decrease and increase
+    @org.springframework.transaction.annotation.Transactional
+    public void decreaseSlots(Long id, int amount) {
+        BundleEntity bundle = getBundleById(id);
+        if (bundle.getAvailableSlotsBundle() < amount) {
+            throw new IllegalStateException("Not enough available slots for bundle: " + bundle.getNameBundle());
+        }
+        bundle.setAvailableSlotsBundle(bundle.getAvailableSlotsBundle() - amount);
+        if (bundle.getAvailableSlotsBundle() == 0 && bundle.getStateBundle() == BundleState.AVAILABLE) {
+            bundle.setStateBundle(BundleState.SOLD_OUT);
+        }
+        bundleRepository.save(bundle);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void increaseSlots(Long id, int amount) {
+        BundleEntity bundle = getBundleById(id);
+        bundle.setAvailableSlotsBundle(bundle.getAvailableSlotsBundle() + amount);
+        if (bundle.getAvailableSlotsBundle() > 0 && bundle.getStateBundle() == BundleState.SOLD_OUT) {
+            bundle.setStateBundle(BundleState.AVAILABLE);
+        }
+        bundleRepository.save(bundle);
     }
 }

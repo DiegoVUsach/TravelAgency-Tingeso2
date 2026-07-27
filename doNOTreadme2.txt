@@ -3,7 +3,8 @@ com.travelagency
 to do:
 carpetas
 
-
+RestTemplate es una clase que se utiliza para hacer peticiones HTTP; es decir, es la herramienta que este microservicio (ms-bundle)
+ usará para comunicarse con otros microservicios de tu ecosistema.
 
 -----------------------------------------------
 EUREKA SERVER = http://localhost:8761

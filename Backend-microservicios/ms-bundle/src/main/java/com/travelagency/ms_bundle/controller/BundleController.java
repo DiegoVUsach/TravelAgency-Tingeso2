@@ -75,4 +75,18 @@ public class BundleController {
 
         return ResponseEntity.ok(results);
     }
+
+    // ========== Internal Endpoints for ms-reservation ==========
+
+    @PutMapping("/internal/{id}/decrease-slots")
+    public ResponseEntity<Void> decreaseSlots(@PathVariable Long id, @RequestParam int amount) {
+        bundleService.decreaseSlots(id, amount);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/internal/{id}/increase-slots")
+    public ResponseEntity<Void> increaseSlots(@PathVariable Long id, @RequestParam int amount) {
+        bundleService.increaseSlots(id, amount);
+        return ResponseEntity.ok().build();
+    }
 }
