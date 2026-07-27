@@ -2,7 +2,8 @@ Java ver 17
 com.travelagency
 to do:
 carpetas
-
+ver tema de optimistic locking para evitar Cond de carrera(?
+)
 RestTemplate es una clase que se utiliza para hacer peticiones HTTP; es decir, es la herramienta que este microservicio (ms-bundle)
  usará para comunicarse con otros microservicios de tu ecosistema.
 
