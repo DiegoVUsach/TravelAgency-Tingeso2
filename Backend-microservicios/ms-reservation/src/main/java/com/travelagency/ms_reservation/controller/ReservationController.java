@@ -59,6 +59,12 @@ public class ReservationController {
         return ResponseEntity.ok(reservations);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ReservationEntity> getReservationById(@PathVariable Long id) {
+        ReservationEntity reservation = reservationService.getReservationById(id);
+        return ResponseEntity.ok(reservation);
+    }
+
     @PatchMapping("/{id}/state")
     public ResponseEntity<ReservationEntity> updateReservationState(
             @PathVariable Long id,

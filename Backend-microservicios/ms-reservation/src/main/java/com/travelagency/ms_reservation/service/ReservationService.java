@@ -297,6 +297,11 @@ public class ReservationService {
         return reservationRepository.findAll();
     }
 
+    public ReservationEntity getReservationById(Long id) {
+        return reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Reservation not found with ID: " + id));
+    }
+
     public long countByBundleId(Long bundleId) {
         return reservationRepository.countByBundleId(bundleId);
     }
