@@ -45,7 +45,7 @@ public class SearchService {
         // Note: the internal endpoint on ms-bundle is still /api/v1/bundle/search
         String baseUrl = "http://ms-bundle/api/v1/bundle/search";
 
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(baseUrl);
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl);
 
         if (destiny != null) builder.queryParam("destiny", destiny);
         if (minPrice != null) builder.queryParam("minPrice", minPrice);

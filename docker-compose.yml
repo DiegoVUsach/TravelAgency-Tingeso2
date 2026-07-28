@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  # =============================================================
+  # MySQL Database (Hosts databases for Keycloak, Bundles, Reservations, Payments)
+  # =============================================================
+  db:
+    image: mysql:8.0
+    container_name: tingeso2-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: clave1234
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - tingeso2-net
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pclave1234" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =============================================================
+  # Keycloak IAM (Identity & Access Management)
+  # =============================================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    container_name: tingeso2-keycloak
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      KC_DB: mysql
+      KC_DB_URL: jdbc:mysql://db:3306/keycloak
+      KC_DB_USERNAME: root
+      KC_DB_PASSWORD: clave1234
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "9090:8080"
+    networks:
+      - tingeso2-net
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+
+networks:
+  tingeso2-net:
+    driver: bridge
