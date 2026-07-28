@@ -1,0 +1,56 @@
+# ==============================================================================
+# 06 - Frontend (React + Nginx)
+# ==============================================================================
+# El Frontend es una SPA (Single Page Application) construida con React/Vite.
+# Se sirve como archivos estáticos desde un contenedor Nginx.
+#
+# Se expone con NodePort (puerto 30000) para que el usuario acceda desde
+# el navegador: http://<minikube-ip>:30000
+#
+# IMPORTANTE — Variables de entorno en Frontend:
+#   React/Vite NO lee variables de entorno en runtime como Spring Boot.
+#   Las variables VITE_* se "queman" (bake) al hacer `npm run build`.
+#   Por eso, para Kubernetes necesitas hacer el build con las URLs correctas:
+#     VITE_API_URL=http://<minikube-ip>:30080/api/v1
+#     VITE_KEYCLOAK_URL=http://<minikube-ip>:30090
+#   antes de construir la imagen Docker del frontend.
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: diegovusach/frontend:latest
+          ports:
+            - containerPort: 80
+
+---
+
+# --- Service (NodePort — accesible desde el navegador) ---
+# nodePort: 30000 → accesible en http://<minikube-ip>:30000
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: travel-agency
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30000

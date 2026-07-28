@@ -1,0 +1,160 @@
+# ==============================================================================
+# 02 - Keycloak (Identity & Access Management)
+# ==============================================================================
+# Keycloak es el servidor de autenticación (Épica 1).
+# Se conecta a MySQL usando el Service "mysql-service" en vez de "localhost".
+#
+# Se expone con NodePort para que puedas acceder al panel de admin desde el
+# navegador (ej: http://<minikube-ip>:30090). Esto es necesario porque el
+# Frontend necesita comunicarse con Keycloak directamente para OAuth2/OIDC.
+#
+# El ConfigMap monta el realm-export.json para importación automática al iniciar.
+# ==============================================================================
+
+# --- ConfigMap con el archivo de Realm para importación automática ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-config
+  namespace: travel-agency
+data:
+  realm-export.json: |
+    {
+      "realm": "travel-agency",
+      "enabled": true,
+      "registrationAllowed": true,
+      "registrationEmailAsUsername": true,
+      "rememberMe": true,
+      "verifyEmail": false,
+      "loginWithEmailAllowed": true,
+      "duplicateEmailsAllowed": false,
+      "resetPasswordAllowed": true,
+      "editUsernameAllowed": false,
+      "bruteForceProtected": true,
+      "maxFailureWaitSeconds": 900,
+      "minimumQuickLoginWaitSeconds": 60,
+      "waitIncrementSeconds": 60,
+      "quickLoginCheckMilliSeconds": 1000,
+      "maxDeltaTimeSeconds": 43200,
+      "failureFactor": 5,
+      "passwordPolicy": "length(8)",
+      "roles": {
+        "realm": [
+          { "name": "ADMIN", "description": "Administrator Role" },
+          { "name": "CLIENT", "description": "Client Customer Role" }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "travel-agency-frontend",
+          "name": "TravelAgency Frontend SPA",
+          "enabled": true,
+          "publicClient": true,
+          "directAccessGrantsEnabled": true,
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "redirectUris": ["*"],
+          "webOrigins": ["*"]
+        },
+        {
+          "clientId": "travel-agency-gateway",
+          "name": "TravelAgency API Gateway",
+          "enabled": true,
+          "bearerOnly": true
+        }
+      ],
+      "users": [
+        {
+          "username": "admin@travelagency.com",
+          "email": "admin@travelagency.com",
+          "firstName": "Admin",
+          "lastName": "TravelAgency",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [{ "type": "password", "value": "admin123", "temporary": false }],
+          "realmRoles": ["ADMIN"]
+        },
+        {
+          "username": "cliente@travelagency.com",
+          "email": "cliente@travelagency.com",
+          "firstName": "Juan",
+          "lastName": "Perez",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [{ "type": "password", "value": "client123", "temporary": false }],
+          "realmRoles": ["CLIENT"]
+        }
+      ]
+    }
+
+---
+
+# --- Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.2
+          args: ["start-dev", "--import-realm"]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KC_DB
+              value: "mysql"
+            - name: KC_DB_URL
+              value: "jdbc:mysql://mysql-service:3306/keycloak"
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: MYSQL_USER
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: MYSQL_ROOT_PASSWORD
+            - name: KEYCLOAK_ADMIN
+              value: "admin"
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              value: "admin"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          volumeMounts:
+            - name: realm-config
+              mountPath: /opt/keycloak/data/import
+      volumes:
+        - name: realm-config
+          configMap:
+            name: keycloak-realm-config
+
+---
+
+# --- Service (NodePort — accesible desde el navegador) ---
+# El Frontend necesita alcanzar Keycloak directamente para el flujo OAuth2.
+# Por eso usamos NodePort aquí (no solo ClusterIP).
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-service
+  namespace: travel-agency
+spec:
+  type: NodePort
+  selector:
+    app: keycloak
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30090

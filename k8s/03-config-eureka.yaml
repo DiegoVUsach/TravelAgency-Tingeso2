@@ -1,0 +1,117 @@
+# ==============================================================================
+# 03 - Config Server + Eureka Server
+# ==============================================================================
+# Estos dos microservicios son INFRAESTRUCTURA, no lógica de negocio.
+# Deben levantar PRIMERO que los demás microservicios.
+#
+# CONFIG SERVER (puerto 8888):
+#   - Es el "repositorio centralizado de configuración".
+#   - Los demás microservicios le piden su configuración al arrancar
+#     (spring.config.import=configserver:http://config-server-service:8888).
+#   - PROBLEMA: Las configuraciones actuales en classpath:/configuraciones/
+#     usan "localhost". En Kubernetes necesitamos apuntar a los nombres de
+#     servicio (ej: mysql-service, eureka-service). Resolvemos esto con
+#     variables de entorno que sobreescriben esas propiedades.
+#
+# EUREKA SERVER (puerto 8761):
+#   - Es el "directorio telefónico" (Service Registry).
+#   - Cada microservicio al arrancar se registra con su nombre (ej: "ms-bundle").
+#   - Cuando ms-reservation necesita llamar a ms-bundle, le pregunta a Eureka
+#     "¿dónde está ms-bundle?" y Eureka responde con la IP:Puerto actual.
+#   - Esto permite que los microservicios usen RestTemplate con
+#     "http://ms-bundle/..." sin saber la IP real.
+# ==============================================================================
+
+# ===== CONFIG SERVER =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-server
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: config-server
+  template:
+    metadata:
+      labels:
+        app: config-server
+    spec:
+      containers:
+        - name: config-server
+          image: diegovusach/config-server:latest
+          ports:
+            - containerPort: 8888
+          env:
+            # Sobreescribimos la URL de Eureka para que apunte al Service de K8s
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://eureka-service:8761/eureka"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8888
+            initialDelaySeconds: 40
+            periodSeconds: 10
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-server-service
+  namespace: travel-agency
+spec:
+  type: ClusterIP
+  selector:
+    app: config-server
+  ports:
+    - port: 8888
+      targetPort: 8888
+
+---
+
+# ===== EUREKA SERVER =====
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eureka-server
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eureka-server
+  template:
+    metadata:
+      labels:
+        app: eureka-server
+    spec:
+      containers:
+        - name: eureka-server
+          image: diegovusach/eureka-server:latest
+          ports:
+            - containerPort: 8761
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8761
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: eureka-service
+  namespace: travel-agency
+spec:
+  type: ClusterIP
+  selector:
+    app: eureka-server
+  ports:
+    - port: 8761
+      targetPort: 8761

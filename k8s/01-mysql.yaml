@@ -1,0 +1,104 @@
+# ==============================================================================
+# 01 - MySQL Database
+# ==============================================================================
+# PersistentVolumeClaim: Reserva espacio en disco para que los datos de MySQL
+# persistan aunque el pod se reinicie o se destruya.
+#
+# Deployment: Crea un pod con MySQL 8.0. Usa la contraseña del Secret y
+# monta el script de inicialización (ConfigMap) para crear las bases de datos.
+#
+# Service (ClusterIP): Expone MySQL SOLO internamente dentro del cluster.
+# Los microservicios se conectan a "mysql-service:3306".
+# ClusterIP es el tipo por defecto y NO es accesible desde fuera del cluster.
+# ==============================================================================
+
+# --- ConfigMap con el script SQL de inicialización ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-script
+  namespace: travel-agency
+data:
+  01-init-databases.sql: |
+    CREATE DATABASE IF NOT EXISTS keycloak;
+    CREATE DATABASE IF NOT EXISTS db_bundles;
+    CREATE DATABASE IF NOT EXISTS db_reservations;
+    CREATE DATABASE IF NOT EXISTS db_payments;
+
+---
+
+# --- PersistentVolumeClaim ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: travel-agency
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+
+# --- Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: MYSQL_ROOT_PASSWORD
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+            - name: mysql-init
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pclave1234"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+        - name: mysql-init
+          configMap:
+            name: mysql-init-script
+
+---
+
+# --- Service (ClusterIP — solo accesible dentro del cluster) ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  namespace: travel-agency
+spec:
+  type: ClusterIP
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306

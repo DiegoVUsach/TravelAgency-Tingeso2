@@ -1,0 +1,321 @@
+# ==============================================================================
+# 04 - Microservicios de Negocio (M2 a M7)
+# ==============================================================================
+# Cada microservicio:
+#   1. Arranca pidiendo su configuración a Config Server
+#      (spring.config.import=configserver:http://config-server-service:8888)
+#   2. Se registra en Eureka para que otros microservicios lo encuentren
+#   3. Si necesita base de datos, se conecta a mysql-service:3306
+#
+# IMPORTANTE — Variables de entorno que sobreescriben propiedades:
+#   Spring Boot convierte propiedades como:
+#     "spring.datasource.url" → variable de entorno "SPRING_DATASOURCE_URL"
+#     "eureka.client.service-url.defaultZone" → "EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE"
+#   Esto permite que el .properties del Config Server diga "localhost" pero
+#   en Kubernetes lo sobreescribamos con el nombre del Service interno.
+#
+# Todos estos Services son ClusterIP porque SOLO el API Gateway necesita
+# alcanzarlos. El Frontend NUNCA habla directamente con estos microservicios.
+# ==============================================================================
+
+
+# ===== MS-BUNDLE (Épica 2: Gestión de Paquetes Turísticos) =====
+# Tiene su propia BD: db_bundles
+# Se comunica con: ms-reservation (para verificar si un paquete tiene reservas)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-bundle
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-bundle
+  template:
+    metadata:
+      labels:
+        app: ms-bundle
+    spec:
+      containers:
+        - name: ms-bundle
+          image: diegovusach/ms-bundle:latest
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:http://config-server-service:8888"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://eureka-service:8761/eureka"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://mysql-service:3306/db_bundles"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: MYSQL_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: MYSQL_ROOT_PASSWORD
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-bundle
+  namespace: travel-agency
+spec:
+  type: ClusterIP
+  selector:
+    app: ms-bundle
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+# ===== MS-SEARCH (Épica 3: Búsqueda de Paquetes) =====
+# NO tiene BD propia, solo llama a ms-bundle vía HTTP/Eureka
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-search
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-search
+  template:
+    metadata:
+      labels:
+        app: ms-search
+    spec:
+      containers:
+        - name: ms-search
+          image: diegovusach/ms-search:latest
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:http://config-server-service:8888"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://eureka-service:8761/eureka"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-search
+  namespace: travel-agency
+spec:
+  type: ClusterIP
+  selector:
+    app: ms-search
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+# ===== MS-RESERVATION (Épica 4: Proceso de Reserva) =====
+# Tiene su propia BD: db_reservations
+# Se comunica con: ms-bundle (para validar disponibilidad y descontar cupos)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-reservation
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-reservation
+  template:
+    metadata:
+      labels:
+        app: ms-reservation
+    spec:
+      containers:
+        - name: ms-reservation
+          image: diegovusach/ms-reservation:latest
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:http://config-server-service:8888"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://eureka-service:8761/eureka"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://mysql-service:3306/db_reservations"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: MYSQL_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: MYSQL_ROOT_PASSWORD
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-reservation
+  namespace: travel-agency
+spec:
+  type: ClusterIP
+  selector:
+    app: ms-reservation
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+# ===== MS-PAYMENT (Épica 5: Gestión de Pagos) =====
+# Tiene su propia BD: db_payments
+# Se comunica con: ms-reservation (para validar la reserva y actualizar estado)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-payment
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-payment
+  template:
+    metadata:
+      labels:
+        app: ms-payment
+    spec:
+      containers:
+        - name: ms-payment
+          image: diegovusach/ms-payment:latest
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:http://config-server-service:8888"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://eureka-service:8761/eureka"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://mysql-service:3306/db_payments"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: MYSQL_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: MYSQL_ROOT_PASSWORD
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-payment
+  namespace: travel-agency
+spec:
+  type: ClusterIP
+  selector:
+    app: ms-payment
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+# ===== MS-TRACKING (Épica 6: Confirmación y Seguimiento) =====
+# NO tiene BD propia, orquesta ms-reservation y ms-bundle vía HTTP/Eureka
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-tracking
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-tracking
+  template:
+    metadata:
+      labels:
+        app: ms-tracking
+    spec:
+      containers:
+        - name: ms-tracking
+          image: diegovusach/ms-tracking:latest
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:http://config-server-service:8888"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://eureka-service:8761/eureka"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-tracking
+  namespace: travel-agency
+spec:
+  type: ClusterIP
+  selector:
+    app: ms-tracking
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+---
+
+# ===== MS-REPORTS (Épica 7: Generación de Reportes) =====
+# NO tiene BD propia, consulta ms-reservation vía HTTP/Eureka
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-reports
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ms-reports
+  template:
+    metadata:
+      labels:
+        app: ms-reports
+    spec:
+      containers:
+        - name: ms-reports
+          image: diegovusach/ms-reports:latest
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:http://config-server-service:8888"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://eureka-service:8761/eureka"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-reports
+  namespace: travel-agency
+spec:
+  type: ClusterIP
+  selector:
+    app: ms-reports
+  ports:
+    - port: 8080
+      targetPort: 8080

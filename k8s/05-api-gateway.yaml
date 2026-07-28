@@ -1,0 +1,72 @@
+# ==============================================================================
+# 05 - API Gateway
+# ==============================================================================
+# El API Gateway es la ÚNICA puerta de entrada al backend desde el exterior.
+# Por eso usa NodePort (puerto 30080) para ser accesible desde el navegador.
+#
+# ¿Por qué NodePort y no ClusterIP?
+#   - ClusterIP = solo accesible dentro del cluster (entre pods)
+#   - NodePort = accesible desde fuera del cluster vía http://<minikube-ip>:30080
+#   - El enunciado PROHÍBE kubectl port-forward, por lo que NodePort es la
+#     forma correcta de exponer servicios hacia el navegador.
+#
+# ¿Por qué los microservicios internos NO deben pasar por el Gateway?
+#   - El enunciado dice: "Los microservicios dentro del Cluster no deben
+#     comunicarse entre ellos a través del API Gateway. Solo el Frontend
+#     es quien se comunica al API Gateway."
+#   - Los microservicios se comunican directamente entre sí usando Eureka
+#     (ej: "http://ms-bundle/api/v1/bundle/...") sin pasar por el Gateway.
+#
+# La variable KEYCLOAK_JWK_SET_URI le indica al Gateway dónde validar los
+# tokens JWT. Dentro del cluster, Keycloak está en "keycloak-service:8080".
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: travel-agency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: diegovusach/api-gateway:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:http://config-server-service:8888"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://eureka-service:8761/eureka"
+            # Keycloak JWK URI — dentro del cluster usamos el nombre del Service
+            - name: KEYCLOAK_JWK_SET_URI
+              value: "http://keycloak-service:8080/realms/travel-agency/protocol/openid-connect/certs"
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI
+              value: "http://keycloak-service:8080/realms/travel-agency/protocol/openid-connect/certs"
+
+---
+
+# --- Service (NodePort — accesible desde el navegador) ---
+# El Frontend envía TODAS sus peticiones API aquí.
+# nodePort: 30080 → accesible en http://<minikube-ip>:30080
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-service
+  namespace: travel-agency
+spec:
+  type: NodePort
+  selector:
+    app: api-gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
