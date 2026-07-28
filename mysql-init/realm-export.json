@@ -1,0 +1,93 @@
+{
+  "realm": "travel-agency",
+  "enabled": true,
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "passwordPolicy": "length(8)",
+  "roles": {
+    "realm": [
+      {
+        "name": "ADMIN",
+        "description": "Administrator Role"
+      },
+      {
+        "name": "CLIENT",
+        "description": "Client Customer Role"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "travel-agency-frontend",
+      "name": "TravelAgency Frontend SPA",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
+    },
+    {
+      "clientId": "travel-agency-gateway",
+      "name": "TravelAgency API Gateway",
+      "enabled": true,
+      "bearerOnly": true
+    }
+  ],
+  "users": [
+    {
+      "username": "admin@travelagency.com",
+      "email": "admin@travelagency.com",
+      "firstName": "Admin",
+      "lastName": "TravelAgency",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "username": "cliente@travelagency.com",
+      "email": "cliente@travelagency.com",
+      "firstName": "Juan",
+      "lastName": "Pérez",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "CLIENT"
+      ]
+    }
+  ]
+}

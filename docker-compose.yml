@@ -31,7 +31,7 @@ services:
     image: quay.io/keycloak/keycloak:26.2
     container_name: tingeso2-keycloak
     restart: unless-stopped
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       KC_DB: mysql
       KC_DB_URL: jdbc:mysql://db:3306/keycloak
@@ -42,6 +42,8 @@ services:
       KC_HEALTH_ENABLED: "true"
     ports:
       - "9090:8080"
+    volumes:
+      - ./mysql-init/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     networks:
       - tingeso2-net
     depends_on:
